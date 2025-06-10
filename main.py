@@ -6,7 +6,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDir
 
 # === Import Tabs ===
-from src.GUI import PlottingTab, FileSummaryTab, CustomFileSystemModel
+from src.GUI import PlottingTab, FileSummaryTab
+from src.GUI.CustomWidgets import CustomFileSystemModel
 
 
 class MainWindow(QMainWindow):

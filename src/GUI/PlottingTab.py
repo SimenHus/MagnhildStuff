@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
 )
 
 
-from .CustomWidgets import PlotWidget
+from src.GUI.CustomWidgets import PlotWidget
 
 class PlottingTab(QWidget):
     description = 'Plotting'

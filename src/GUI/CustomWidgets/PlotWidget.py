@@ -1,10 +1,11 @@
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QPushButton, QScrollArea, QFrame, 
-    QGridLayout, QMenu, QFileSystemModel, QApplication
+    QWidget, QVBoxLayout, QHBoxLayout, QFrame, QDialog,
+    QMenu, QApplication, QListWidget,
+    QLineEdit, QDialogButtonBox
 )
 
-from PySide6.QtCore import Qt, QPoint, Signal, QMimeData, QByteArray, QDataStream, QIODevice, QModelIndex, QEvent
+from PySide6.QtCore import Qt, QPoint, Signal, QMimeData, QByteArray, QDataStream, QIODevice, QEvent
 from PySide6.QtGui import QDrag, QAction
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -15,16 +16,47 @@ import os
 from src.structs import AntennaMeasurement
 
 
-class CustomFileSystemModel(QFileSystemModel):
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole):
-        if index.column() == 2 and role == Qt.DisplayRole:  # Column 2 = "Type"
-            file_path = self.filePath(index)
-            if os.path.isdir(file_path):
-                return "Folder"
-            else:
-                return os.path.splitext(file_path)[1]  # Extension like '.png'
-        return super().data(index, role)
+class RenameLineDialog(QDialog):
+    def __init__(self, line_labels, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Rename Line")
 
+        self.selected_label = None
+        self.new_label = None
+
+        layout = QVBoxLayout(self)
+
+        hlayout = QHBoxLayout()
+
+        self.list_widget = QListWidget()
+        self.list_widget.addItems(line_labels)
+        self.list_widget.setCurrentRow(0)
+
+        self.input_field = QLineEdit()
+        self.input_field.setPlaceholderText("Enter new label...")
+
+        hlayout.addWidget(self.list_widget)
+        hlayout.addWidget(self.input_field)
+
+        layout.addLayout(hlayout)
+
+        # Dialog buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self.list_widget.currentTextChanged.connect(self.prefill_input)
+
+        self.prefill_input(self.list_widget.currentItem().text())
+
+    def prefill_input(self, text):
+        self.input_field.setText(text)
+
+    def accept(self):
+        self.selected_label = self.list_widget.currentItem().text()
+        self.new_label = self.input_field.text()
+        super().accept()
 
 
 
@@ -142,7 +174,7 @@ class PlotWidget(QFrame):
 
         try:
             meas = AntennaMeasurement.from_file(file_path)
-            label = os.path.basename(file_path)
+            label = os.path.basename(file_path).strip('.h5ant')
             line, = self.ax.plot(meas.angles_rad, meas.power, label=label)
             self.plotted_files[file_path] = line
             self.plotted_meas[file_path] = meas
@@ -153,6 +185,21 @@ class PlotWidget(QFrame):
 
     def open_context_menu(self, pos: QPoint):
         menu = QMenu(self)
+
+        
+        msg = 'Use normalization' if not self.normalized else 'Ignore normalization'
+        toggle_normalized = QAction(msg, self)
+        toggle_normalized.triggered.connect(self.toggle_normalization)
+        menu.addAction(toggle_normalized)
+
+        rename_action = QAction('Rename line', self)
+        if not self.plotted_files:
+            rename_action.setDisabled(True)
+        else:
+            rename_action.triggered.connect(self.rename_line_dialog)
+        menu.addAction(rename_action)
+
+        menu.addSeparator()
         remove_menu = menu.addMenu("Remove Plotted File")
         if not self.plotted_files:
             remove_menu.setDisabled(True)
@@ -163,18 +210,29 @@ class PlotWidget(QFrame):
                 action.triggered.connect(lambda checked, fp=file_path: self.remove_file(fp))
                 remove_menu.addAction(action)
 
-        menu.addSeparator()
         remove_plot_action = QAction("Remove This Plot Window", self)
         remove_plot_action.triggered.connect(lambda: self.remove_requested.emit(self))
         menu.addAction(remove_plot_action)
 
-        menu.addSeparator()
-        msg = 'Use normalization' if not self.normalized else 'Ignore normalization'
-        toggle_normalized = QAction(msg, self)
-        toggle_normalized.triggered.connect(self.toggle_normalization)
-        menu.addAction(toggle_normalized)
-
         menu.exec(self.mapToGlobal(pos))
+
+    def rename_line_dialog(self):
+
+        # Build list of current labels
+        lines = self.plotted_files.values()
+        items = [line.get_label() for line in lines]
+        dialog = RenameLineDialog(items, self)
+
+        if dialog.exec() != QDialog.Accepted: return
+
+        old_label = dialog.selected_label
+        new_label = dialog.new_label
+
+        for line in lines:
+            if line.get_label() != old_label: continue
+            line.set_label(new_label)
+            break
+        self.update_plot()
 
     def toggle_normalization(self) -> None:
         self.normalized = not self.normalized
