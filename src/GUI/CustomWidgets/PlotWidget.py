@@ -204,9 +204,10 @@ class PlotWidget(QFrame):
         if not self.plotted_files:
             remove_menu.setDisabled(True)
         else:
-            for file_path in list(self.plotted_files.keys()):
+            for file_path, line in self.plotted_files.items():
                 file_name = os.path.basename(file_path)
-                action = QAction(file_name, self)
+                label_name = line.get_label()
+                action = QAction(label_name, self)
                 action.triggered.connect(lambda checked, fp=file_path: self.remove_file(fp))
                 remove_menu.addAction(action)
 
