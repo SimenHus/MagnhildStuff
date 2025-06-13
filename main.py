@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QSplitter, QTextEdit, QHeaderView, QAbstractItemView
 )
 from PySide6.QtCore import Qt, QDir
+import os
 
 # === Import Tabs ===
 from src.GUI import PlottingTab, FileSummaryTab
@@ -94,6 +95,8 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, project_root)
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

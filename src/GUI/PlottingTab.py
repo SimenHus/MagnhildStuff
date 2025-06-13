@@ -24,8 +24,6 @@ class PlottingTab(QWidget):
         self.settings_group = QGroupBox('Settings')
         self.settings_layout = QFormLayout()
 
-
-
         self.normalization_mode_selector = QComboBox()
         modes = list(Normalization)
         for mode in modes:
@@ -98,6 +96,8 @@ class PlottingTab(QWidget):
             self.relayout_grid()
             self.logger.info('Removed plot')
 
+            self.global_update()
+
     def relayout_grid(self):
         # Clear the layout and re-add widgets in correct order
         for i in reversed(range(self.grid_layout.count())):
@@ -138,9 +138,12 @@ class PlottingTab(QWidget):
 
         for plot in self.plot_widgets:
             plot.update_plot() # Perform plot update
+        self.logger.info('Performed global plot update')
 
     def update_normalization_mode(self, *args, **kwargs) -> None:
+        from_mode = self.normalization_mode
         self.normalization_mode = self.normalization_mode_selector.currentData(Qt.UserRole)
+        self.logger.info(f'Updated normalization mode from {from_mode.name} to {self.normalization_mode.name}')
         self.global_update()
 
     def update_columns(self, value: int) -> None:
