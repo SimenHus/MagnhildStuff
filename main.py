@@ -8,8 +8,8 @@ import os
 
 # === Import Tabs ===
 from src.GUI import PlottingTab, FileSummaryTab
-from src.GUI.CustomWidgets import CustomFileSystemModel
-from src.util import Logging
+from src.GUI.CustomWidgets import FileExplorer
+from src.util import Logging, Path
 
 
 class MainWindow(QMainWindow):
@@ -19,27 +19,7 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
 
         # === File Explorer Setup ===
-        self.file_model = CustomFileSystemModel()
-        self.file_model.setRootPath(QDir.currentPath())
-        # self.file_model.setReadOnly(False)
-
-        self.tree = QTreeView()
-        self.tree.setModel(self.file_model)
-        self.tree.setRootIndex(self.file_model.index(QDir.currentPath()))
-        self.tree.setHeaderHidden(True)
-        self.tree.setMinimumWidth(250)
-        self.tree.setDragEnabled(True)
-        self.tree.setDragDropMode(QAbstractItemView.DragOnly)
-        columns_to_hide = [1, 2, 3] # 0 = Name, 1 = Size, 2 = Type, 3 = Date modified
-        for col in columns_to_hide: 
-            self.tree.hideColumn(col)
-
-        # Control column resize behavior
-        header = self.tree.header()
-        header.setSectionResizeMode(0, QHeaderView.Stretch)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.file_explorer = FileExplorer()
 
         # === Tabs ===
         self.tabs = QTabWidget()
@@ -54,7 +34,7 @@ class MainWindow(QMainWindow):
         self.log_display.setPlaceholderText("Output / Logs")
         self.log_display.setMaximumHeight(150)
         self.log_display.setReadOnly(True)
-        Logging.setup_logging('./debug', self.log_display)
+        Logging.setup_logging(self.log_display, Path.debug_folder())
 
         # === Right Side (Tabs + Output) ===
         right_splitter = QSplitter(Qt.Vertical)
@@ -64,7 +44,7 @@ class MainWindow(QMainWindow):
 
         # === Main Splitter ===
         main_splitter = QSplitter(Qt.Horizontal)
-        main_splitter.addWidget(self.tree)
+        main_splitter.addWidget(self.file_explorer)
         main_splitter.addWidget(right_splitter)
         main_splitter.setSizes([250, 950])
         self.setCentralWidget(main_splitter)
@@ -74,29 +54,21 @@ class MainWindow(QMainWindow):
         file_menu = menu_bar.addMenu("File")
 
         # === Signals ===
-        change_root_action = file_menu.addAction("Change Folder...")
-        change_root_action.triggered.connect(self.change_root_folder)
-        self.tree.selectionModel().selectionChanged.connect(self.on_file_selected)
-
-    def change_root_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, "Select Folder", QDir.currentPath())
-        if folder:
-            self.tree.setRootIndex(self.file_model.index(folder))
+        self.file_explorer.selection_connect(self.on_file_selected)
 
     def on_file_selected(self, selected, deselected):
         indexes = selected.indexes()
         if not indexes: return
 
         index = indexes[0]
-        file_path = self.file_model.filePath(index)
+        file_path = self.file_explorer.file_path(index)
 
         # Call the tab's method to update its summary
         self.summary_tab.update_summary(file_path)
 
 
 if __name__ == "__main__":
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, project_root)
+    Path.initialize()
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

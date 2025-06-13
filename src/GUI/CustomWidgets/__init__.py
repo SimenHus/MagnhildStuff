@@ -1,2 +1,2 @@
-from .CustomFileSystemModel import CustomFileSystemModel
 from .PlotWidget import PlotWidget
+from .FileExplorer import FileExplorer

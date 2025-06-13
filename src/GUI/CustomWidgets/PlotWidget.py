@@ -15,7 +15,7 @@ import os
 
 from src.enums import Normalization
 from src.structs import AntennaMeasurement
-from src.util import Logging
+from src.util import Logging, Path
 
 
 class RenameLineDialog(QDialog):
@@ -69,7 +69,7 @@ class SaveFigureDialog(QDialog):
         self.filename = None
         self.extension = None
 
-        extensions = ['pdf', 'png']
+        extensions = ['pdf', 'png', 'jpg']
 
         layout = QVBoxLayout(self)
 
@@ -112,7 +112,7 @@ class PlotWidget(QFrame):
 
         self.ax = self.figure.add_subplot(111, projection='polar')
         self.ax.set_theta_zero_location("N")
-        
+        self.legend = None
         
         self.layout.addWidget(self.canvas)
         self.setLayout(self.layout)
@@ -137,16 +137,15 @@ class PlotWidget(QFrame):
         self.logger = Logging.get_logger('PlotWidget')
 
 
-
-    def eventFilter(self, source, event):
-        if source is self.canvas:
-            if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
-                self.drag_start_position = event.pos()
-            elif event.type() == QEvent.MouseMove and event.buttons() & Qt.LeftButton:
-                if (event.pos() - self.drag_start_position).manhattanLength() >= QApplication.startDragDistance():
-                    self.start_drag(event)
-                    return True  # Block further handling
-        return super().eventFilter(source, event)
+    # def eventFilter(self, source, event):
+    #     if source is self.canvas:
+    #         if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+    #             self.drag_start_position = event.pos()
+    #         elif event.type() == QEvent.MouseMove and event.buttons() & Qt.LeftButton:
+    #             if (event.pos() - self.drag_start_position).manhattanLength() >= QApplication.startDragDistance():
+    #                 self.start_drag(event)
+    #                 return True  # Block further handling
+    #     return super().eventFilter(source, event)
 
     def dragEnterEvent(self, event):
         # Accept both external file drops and internal drag reorder
@@ -287,7 +286,7 @@ class PlotWidget(QFrame):
             if line.get_label() != old_label: continue
             line.set_label(new_label)
             break
-        self.update_labels()
+        self.update_legend()
 
 
     def remove_file(self, file_path):
@@ -306,16 +305,29 @@ class PlotWidget(QFrame):
 
         filename = dialog.filename
         extension = dialog.extension
-        path = f'./output/{filename}.{extension}'
+        file = f'{filename}.{extension}'
+        folder = Path.output_folder()
+        path = Path.join(folder, file)
         self.figure.savefig(path, format=extension)
         self.logger.info(f'Saved figure to {path}')
 
     def prepare_for_update(self) -> None:
         self.determine_local_extremes()
 
-    def update_labels(self) -> None:
-        self.ax.legend(loc='upper left', bbox_to_anchor=(-0.35, 1.18), frameon=True)
+    def update_legend(self) -> None:
+        if not self.plotted_files: return
+        if self.legend:
+            bbox = self.legend.get_frame().get_bbox()
+            bbox_axes = bbox.transformed(self.ax.transAxes.inverted())
+            bbox_to_anchor = bbox_axes.bounds[:2]
+            loc = self.legend._loc
+            self.legend.remove()
+            self.legend = self.ax.legend(loc=loc, bbox_to_anchor=bbox_to_anchor)
+        else:
+            self.legend = self.ax.legend()
+        self.legend.set_draggable(True)
 
     def update_plot(self) -> None:
+        self.update_legend()
         self.normalize()
         self.canvas.draw()

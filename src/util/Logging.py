@@ -23,7 +23,7 @@ class QTextEditHandler(logging.Handler, QObject):
         self.widget.moveCursor(QTextCursor.End)
 
 
-def setup_logging(log_folder = '.', textedit = None) -> None:
+def setup_logging(textedit = None, log_folder = '.', ) -> None:
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s [%(levelname)s] [%(name)s]: %(message)s',
