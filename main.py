@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, QDir
 # === Import Tabs ===
 from src.GUI import PlottingTab, FileSummaryTab
 from src.GUI.CustomWidgets import CustomFileSystemModel
+from src.util import Logging
 
 
 class MainWindow(QMainWindow):
@@ -48,14 +49,16 @@ class MainWindow(QMainWindow):
 
 
         # === Bottom Output Box ===
-        self.bottom_box = QTextEdit()
-        self.bottom_box.setPlaceholderText("Output / Logs")
-        self.bottom_box.setMaximumHeight(150)
+        self.log_display = QTextEdit()
+        self.log_display.setPlaceholderText("Output / Logs")
+        self.log_display.setMaximumHeight(150)
+        self.log_display.setReadOnly(True)
+        Logging.setup_logging('./debug', self.log_display)
 
         # === Right Side (Tabs + Output) ===
         right_splitter = QSplitter(Qt.Vertical)
         right_splitter.addWidget(self.tabs)
-        right_splitter.addWidget(self.bottom_box)
+        right_splitter.addWidget(self.log_display)
         right_splitter.setSizes([600, 150])
 
         # === Main Splitter ===

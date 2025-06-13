@@ -13,7 +13,9 @@ import numpy as np
 import os
 
 
+from src.enums import Normalization
 from src.structs import AntennaMeasurement
+from src.util import Logging
 
 
 class RenameLineDialog(QDialog):
@@ -59,6 +61,40 @@ class RenameLineDialog(QDialog):
         super().accept()
 
 
+class SaveFigureDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Save Figure")
+
+        self.filename = None
+        self.extension = None
+
+        extensions = ['pdf', 'png']
+
+        layout = QVBoxLayout(self)
+
+        self.list_widget = QListWidget()
+        self.list_widget.addItems(extensions)
+        self.list_widget.setCurrentRow(0)
+
+        self.input_field = QLineEdit()
+        self.input_field.setPlaceholderText('Enter filename...')
+
+        layout.addWidget(self.list_widget)
+        layout.addWidget(self.input_field)
+
+        # Dialog buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def accept(self):
+        self.extension = self.list_widget.currentItem().text()
+        self.filename = self.input_field.text()
+        super().accept()
+
+
 
 class PlotWidget(QFrame):
     # Signal emitted when this plot widget wants to be removed
@@ -95,7 +131,10 @@ class PlotWidget(QFrame):
         self.drag_start_position = None
 
         self.tab_parent = parent
-        self.normalized = True
+        self.peak = None
+        self.floor = None
+
+        self.logger = Logging.get_logger('PlotWidget')
 
 
 
@@ -124,7 +163,8 @@ class PlotWidget(QFrame):
                 if ext in ['.h5ant']:
                     if self.plot_file(file_path):
                         updated = True
-            if updated: self.update_plot()
+            if updated:
+                self.tab_parent.global_update()
             event.acceptProposedAction()
         elif event.mimeData().hasFormat("application/x-plotwidget"):
             # Internal reorder drop
@@ -154,19 +194,32 @@ class PlotWidget(QFrame):
 
         drag.exec(Qt.MoveAction)
 
-    def normalize(self) -> None:
-        if not self.normalized: return self.denormalize()
+
+    def determine_local_extremes(self) -> None:
         peak = -np.inf
+        floor = np.inf
         for value in self.plotted_meas.values():
             if value.peak > peak: peak = value.peak
+            if value.floor < floor: floor = value.floor
+        self.peak = peak
+        self.floor = floor
+        
+
+    def normalize(self) -> None:
+        norm_mode = self.tab_parent.normalization_mode
+        match norm_mode:
+            case Normalization.IGNORED: peak, floor = 0, 0
+            case Normalization.LOCAL: peak, floor = self.peak, self.floor
+            case Normalization.GLOBAL: peak, floor = self.tab_parent.peak, self.tab_parent.floor
         
         for key, value in self.plotted_meas.items():
             self.plotted_files[key].set_ydata(value.power - peak)
 
-    def denormalize(self) -> None:
-        for key, value in self.plotted_meas.items():
-            self.plotted_files[key].set_ydata(value.power)
-    
+        if norm_mode == Normalization.GLOBAL:
+            self.ax.set_ylim(ymin=floor, ymax=0, auto=False)
+        else:
+            self.ax.relim()
+            self.ax.autoscale_view()
 
     def plot_file(self, file_path) -> bool:
         if file_path in self.plotted_files:
@@ -185,12 +238,18 @@ class PlotWidget(QFrame):
 
     def open_context_menu(self, pos: QPoint):
         menu = QMenu(self)
-
         
-        msg = 'Use normalization' if not self.normalized else 'Ignore normalization'
-        toggle_normalized = QAction(msg, self)
-        toggle_normalized.triggered.connect(self.toggle_normalization)
-        menu.addAction(toggle_normalized)
+        norm_msg = {
+            Normalization.IGNORED: 'Ignore normalization',
+            Normalization.LOCAL: 'Local normalization',
+            Normalization.GLOBAL: 'Global normalization'
+        }
+        normalization_menu = menu.addMenu('Normalization mode')
+        for norm_mode, msg in norm_msg.items():
+            action = QAction(msg, self)
+            action.triggered.connect(lambda checked, mode=norm_mode: self.tab_parent.set_normalization_mode(mode))
+            if norm_mode == self.tab_parent.normalization_mode: action.setDisabled(True)
+            normalization_menu.addAction(action)
 
         rename_action = QAction('Rename line', self)
         if not self.plotted_files:
@@ -205,7 +264,6 @@ class PlotWidget(QFrame):
             remove_menu.setDisabled(True)
         else:
             for file_path, line in self.plotted_files.items():
-                file_name = os.path.basename(file_path)
                 label_name = line.get_label()
                 action = QAction(label_name, self)
                 action.triggered.connect(lambda checked, fp=file_path: self.remove_file(fp))
@@ -214,6 +272,14 @@ class PlotWidget(QFrame):
         remove_plot_action = QAction("Remove This Plot Window", self)
         remove_plot_action.triggered.connect(lambda: self.remove_requested.emit(self))
         menu.addAction(remove_plot_action)
+
+        menu.addSeparator()
+        save_action = QAction('Save figure', self)
+        if not self.plotted_files:
+            save_action.setDisabled(True)
+        else:
+            save_action.triggered.connect(self.save_figure)
+        menu.addAction(save_action)
 
         menu.exec(self.mapToGlobal(pos))
 
@@ -235,20 +301,33 @@ class PlotWidget(QFrame):
             break
         self.update_plot()
 
-    def toggle_normalization(self) -> None:
-        self.normalized = not self.normalized
-        self.update_plot()
 
     def remove_file(self, file_path):
         if file_path in self.plotted_files:
             self.plotted_meas.pop(file_path)
             line = self.plotted_files.pop(file_path)
             line.remove()  # Remove line from axes
-            self.update_plot()
+            self.tab_parent.global_update()
+
+
+    def save_figure(self) -> None:
+        
+        dialog = SaveFigureDialog(self)
+
+        if dialog.exec() != QDialog.Accepted: return
+
+        filename = dialog.filename
+        extension = dialog.extension
+        path = f'./output/{filename}.{extension}'
+        self.figure.savefig(path, format=extension)
+        self.log(f'Saved figure to {path}')
+
 
     def update_plot(self) -> None:
-        self.ax.legend(loc='upper right', bbox_to_anchor=(1.1, 1.1), frameon=False)
+        self.ax.legend(loc='upper left', bbox_to_anchor=(-0.35, 1.18), frameon=True)
+        self.determine_local_extremes()
         self.normalize()
-        self.ax.relim()
-        self.ax.autoscale_view()
         self.canvas.draw()
+
+    def log(self, msg) -> None:
+        self.logger.info(msg)

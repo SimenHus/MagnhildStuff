@@ -17,37 +17,45 @@ class AntennaMeasurement:
         return self.power[self.closest_angle_index(angle_deg)]
 
     @property
-    def angles_rad(self):
+    def angles_rad(self) -> float:
         return np.deg2rad(self.angles_deg)
     
     @property
-    def peak(self):
+    def floor(self) -> float:
+        return np.min(self.power)
+    
+    @property
+    def floor_index(self) -> int:
+        return np.argmin(self.power)
+    
+    @property
+    def peak(self) -> float:
         return np.max(self.power)
     
     @property
-    def peak_index(self):
+    def peak_index(self) -> int:
         return np.argmax(self.power)
     
     @property
-    def angle_at_peak(self):
+    def angle_at_peak(self) -> float:
         return self.angles_deg[self.peak_index]
     
     @property
-    def HPBW(self):
+    def HPBW(self) -> float:
         return abs(self.HPBW_left - self.HPBW_right)
     
     @property
-    def HPBW_left(self):
+    def HPBW_left(self) -> float:
         index = self.dist_from_peak(Sign.POSITIVE, 3)
         return self.angles_deg[index]
     
     @property
-    def HPBW_right(self):
+    def HPBW_right(self) -> float:
         index = self.dist_from_peak(Sign.NEGATIVE, 3)
         return self.angles_deg[index]
 
 
-    def dist_from_peak(self, direction: Sign, db = 3):
+    def dist_from_peak(self, direction: Sign, db = 3) -> int:
         current_index = self.peak_index
         while self.peak < self.power[current_index] + db:
             current_index += direction.value
@@ -57,7 +65,7 @@ class AntennaMeasurement:
         return current_index
 
 
-    def closest_angle_index(self, target):
+    def closest_angle_index(self, target) -> int:
         delta = (self.angles_deg - target + 180) % 360 - 180
         return np.argmin(np.abs(delta))
 

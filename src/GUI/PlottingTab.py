@@ -2,8 +2,10 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QScrollArea, QGridLayout
 )
 
-
 from src.GUI.CustomWidgets import PlotWidget
+from src.enums import Normalization
+from src.util import Logging
+import numpy as np
 
 class PlottingTab(QWidget):
     description = 'Plotting'
@@ -29,8 +31,12 @@ class PlottingTab(QWidget):
         self.setLayout(self.layout)
 
         self.plot_widgets = []
-        self.columns = 3  # Number of columns in grid
+        self.columns = 2  # Number of columns in grid
         self.setAcceptDrops(True)
+
+        self.normalization_mode = Normalization.GLOBAL
+        self.logger = Logging.get_logger('Plot Tab')
+
 
     def add_plot(self):
         plot_widget = PlotWidget(self)
@@ -43,6 +49,8 @@ class PlottingTab(QWidget):
 
         self.grid_layout.addWidget(plot_widget, row, col)
         self.plot_widgets.append(plot_widget)
+        self.logger.info('Created new plot')
+
 
     def remove_plot(self, plot_widget):
         if plot_widget in self.plot_widgets:
@@ -52,6 +60,7 @@ class PlottingTab(QWidget):
             self.grid_layout.removeWidget(plot_widget)
             plot_widget.deleteLater()
             self.relayout_grid()
+            self.logger.info('Removed plot')
 
     def relayout_grid(self):
         # Clear the layout and re-add widgets in correct order
@@ -86,3 +95,27 @@ class PlottingTab(QWidget):
 
         # Update layout
         self.relayout_grid()
+
+    def global_update(self) -> None:
+        for plot in self.plot_widgets:
+            plot.update_plot()
+
+    def set_normalization_mode(self, mode: Normalization) -> None:
+        self.normalization_mode = mode
+        self.global_update()
+
+    @property
+    def peak(self) -> float:
+        peak = -np.inf
+        for plot in self.plot_widgets:
+            if plot.peak is None: continue
+            if plot.peak > peak: peak = plot.peak
+        return peak
+    
+    @property
+    def floor(self) -> float:
+        floor = np.inf
+        for plot in self.plot_widgets:
+            if plot.floor is None: continue
+            if plot.floor < floor: floor = plot.floor
+        return floor
