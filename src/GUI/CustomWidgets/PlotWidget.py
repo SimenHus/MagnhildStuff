@@ -233,23 +233,11 @@ class PlotWidget(QFrame):
             self.plotted_meas[file_path] = meas
             return True
         except Exception as e:
-            print(f"Failed to plot {file_path}: {e}")
+            self.logger.error(f"Failed to plot {file_path}: {e}")
             return False
 
     def open_context_menu(self, pos: QPoint):
         menu = QMenu(self)
-        
-        norm_msg = {
-            Normalization.IGNORED: 'Ignore normalization',
-            Normalization.LOCAL: 'Local normalization',
-            Normalization.GLOBAL: 'Global normalization'
-        }
-        normalization_menu = menu.addMenu('Normalization mode')
-        for norm_mode, msg in norm_msg.items():
-            action = QAction(msg, self)
-            action.triggered.connect(lambda checked, mode=norm_mode: self.tab_parent.set_normalization_mode(mode))
-            if norm_mode == self.tab_parent.normalization_mode: action.setDisabled(True)
-            normalization_menu.addAction(action)
 
         rename_action = QAction('Rename line', self)
         if not self.plotted_files:
@@ -299,7 +287,7 @@ class PlotWidget(QFrame):
             if line.get_label() != old_label: continue
             line.set_label(new_label)
             break
-        self.update_plot()
+        self.update_labels()
 
 
     def remove_file(self, file_path):
@@ -320,14 +308,14 @@ class PlotWidget(QFrame):
         extension = dialog.extension
         path = f'./output/{filename}.{extension}'
         self.figure.savefig(path, format=extension)
-        self.log(f'Saved figure to {path}')
+        self.logger.info(f'Saved figure to {path}')
 
+    def prepare_for_update(self) -> None:
+        self.determine_local_extremes()
+
+    def update_labels(self) -> None:
+        self.ax.legend(loc='upper left', bbox_to_anchor=(-0.35, 1.18), frameon=True)
 
     def update_plot(self) -> None:
-        self.ax.legend(loc='upper left', bbox_to_anchor=(-0.35, 1.18), frameon=True)
-        self.determine_local_extremes()
         self.normalize()
         self.canvas.draw()
-
-    def log(self, msg) -> None:
-        self.logger.info(msg)

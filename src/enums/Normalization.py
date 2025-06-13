@@ -1,8 +1,8 @@
 
-from enum import Enum
+from enum import Enum, auto
 
 
 class Normalization(Enum):
-    IGNORED = 0
-    GLOBAL = 1
-    LOCAL = 2
+    GLOBAL = auto()
+    LOCAL = auto()
+    IGNORED = auto()

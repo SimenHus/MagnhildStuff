@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QPushButton, QScrollArea, QGridLayout
+    QWidget, QVBoxLayout, QPushButton, QScrollArea, QGridLayout, QGroupBox, QComboBox,
+    QHBoxLayout, QLabel, QFormLayout, QSpinBox
 )
+from PySide6.QtCore import Qt
 
 from src.GUI.CustomWidgets import PlotWidget
 from src.enums import Normalization
@@ -16,25 +18,59 @@ class PlottingTab(QWidget):
         self.add_button = QPushButton("Add Plot Window")
         self.add_button.clicked.connect(self.add_plot)
 
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+
+        self.settings_group = QGroupBox('Settings')
+        self.settings_layout = QFormLayout()
+
+
+
+        self.normalization_mode_selector = QComboBox()
+        modes = list(Normalization)
+        for mode in modes:
+            self.normalization_mode_selector.addItem(mode.name, userData=mode)
+        self.normalization_mode = modes[0]
+        self.normalization_mode_selector.setCurrentIndex(0)
+        self.normalization_mode_selector.currentIndexChanged.connect(self.update_normalization_mode)
+
+        normalization_widget = QWidget()
+        normalization_layout = QHBoxLayout()
+        normalization_layout.addWidget(QLabel('Normalization mode:'))
+        normalization_layout.addWidget(self.normalization_mode_selector)
+        normalization_widget.setLayout(normalization_layout)
+
+        columns_init = 2
+        self.columns_spinbox = QSpinBox()
+        self.columns_spinbox.setMinimum(1)
+        self.columns_spinbox.setMaximum(5)
+        self.columns_spinbox.setValue(columns_init)
+        self.columns_spinbox.valueChanged.connect(self.update_columns)
+        self.columns = columns_init
+        columns_widget = QWidget()
+        columns_layout = QHBoxLayout()
+        columns_layout.addWidget(QLabel('Columns:'))
+        columns_layout.addWidget(self.columns_spinbox)
+        columns_widget.setLayout(columns_layout)
+
+        self.settings_layout.addWidget(normalization_widget)
+        self.settings_layout.addWidget(columns_widget)
+        self.settings_layout.addWidget(self.add_button)
+        self.settings_group.setLayout(self.settings_layout)
 
         self.plot_area = QWidget()
         self.grid_layout = QGridLayout()
         self.grid_layout.setSpacing(10)
         self.plot_area.setLayout(self.grid_layout)
 
-        self.scroll.setWidget(self.plot_area)
-
-        self.layout.addWidget(self.add_button)
-        self.layout.addWidget(self.scroll)
+        self.scroll_area.setWidget(self.plot_area)
+        self.layout.addWidget(self.settings_group)
+        self.layout.addWidget(self.scroll_area)
         self.setLayout(self.layout)
 
         self.plot_widgets = []
-        self.columns = 2  # Number of columns in grid
         self.setAcceptDrops(True)
 
-        self.normalization_mode = Normalization.GLOBAL
         self.logger = Logging.get_logger('Plot Tab')
 
 
@@ -98,11 +134,18 @@ class PlottingTab(QWidget):
 
     def global_update(self) -> None:
         for plot in self.plot_widgets:
-            plot.update_plot()
+            plot.prepare_for_update() # Prepare for plotting (update extremes etc)
 
-    def set_normalization_mode(self, mode: Normalization) -> None:
-        self.normalization_mode = mode
+        for plot in self.plot_widgets:
+            plot.update_plot() # Perform plot update
+
+    def update_normalization_mode(self, *args, **kwargs) -> None:
+        self.normalization_mode = self.normalization_mode_selector.currentData(Qt.UserRole)
         self.global_update()
+
+    def update_columns(self, value: int) -> None:
+        self.columns = value
+        self.relayout_grid()
 
     @property
     def peak(self) -> float:

@@ -3,6 +3,7 @@
 import logging
 from PySide6.QtWidgets import QTextEdit
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtGui import QTextCursor
 
 class QTextEditHandler(logging.Handler, QObject):
     log_signal = Signal(str)  # thread-safe signal to update QTextEdit
@@ -19,6 +20,7 @@ class QTextEditHandler(logging.Handler, QObject):
 
     def append_log(self, msg):
         self.widget.append(msg)
+        self.widget.moveCursor(QTextCursor.End)
 
 
 def setup_logging(log_folder = '.', textedit = None) -> None:
