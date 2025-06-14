@@ -1,12 +1,10 @@
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFrame, QDialog,
-    QMenu, QApplication, QListWidget,
-    QLineEdit, QDialogButtonBox
+    QWidget, QVBoxLayout, QFrame, QDialog, QMenu
 )
 
-from PySide6.QtCore import Qt, QPoint, Signal, QMimeData, QByteArray, QDataStream, QIODevice, QEvent
-from PySide6.QtGui import QDrag, QAction
+from PySide6.QtCore import Qt, QPoint, Signal
+from PySide6.QtGui import QAction
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
@@ -17,84 +15,7 @@ from src.enums import Normalization
 from src.structs import AntennaMeasurement
 from src.util import Logging, Path
 
-
-class RenameLineDialog(QDialog):
-    def __init__(self, line_labels, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Rename Line")
-
-        self.selected_label = None
-        self.new_label = None
-
-        layout = QVBoxLayout(self)
-
-        hlayout = QHBoxLayout()
-
-        self.list_widget = QListWidget()
-        self.list_widget.addItems(line_labels)
-        self.list_widget.setCurrentRow(0)
-
-        self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Enter new label...")
-
-        hlayout.addWidget(self.list_widget)
-        hlayout.addWidget(self.input_field)
-
-        layout.addLayout(hlayout)
-
-        # Dialog buttons
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-        self.list_widget.currentTextChanged.connect(self.prefill_input)
-
-        self.prefill_input(self.list_widget.currentItem().text())
-
-    def prefill_input(self, text):
-        self.input_field.setText(text)
-
-    def accept(self):
-        self.selected_label = self.list_widget.currentItem().text()
-        self.new_label = self.input_field.text()
-        super().accept()
-
-
-class SaveFigureDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Save Figure")
-
-        self.filename = None
-        self.extension = None
-
-        extensions = ['pdf', 'png', 'jpg']
-
-        layout = QVBoxLayout(self)
-
-        self.list_widget = QListWidget()
-        self.list_widget.addItems(extensions)
-        self.list_widget.setCurrentRow(0)
-
-        self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText('Enter filename...')
-
-        layout.addWidget(self.list_widget)
-        layout.addWidget(self.input_field)
-
-        # Dialog buttons
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    def accept(self):
-        self.extension = self.list_widget.currentItem().text()
-        self.filename = self.input_field.text()
-        super().accept()
-
-
+from .Dialogs import RenameLineDialog, SaveFigureDialog, ColorDialog
 
 class PlotWidget(QFrame):
     # Signal emitted when this plot widget wants to be removed
@@ -125,11 +46,6 @@ class PlotWidget(QFrame):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.open_context_menu)
 
-        # For drag and drop reorder
-        self.setMouseTracking(True)
-        self.setAttribute(Qt.WA_Hover)
-        self.drag_start_position = None
-
         self.tab_parent = parent
         self.peak = None
         self.floor = None
@@ -137,19 +53,9 @@ class PlotWidget(QFrame):
         self.logger = Logging.get_logger('PlotWidget')
 
 
-    # def eventFilter(self, source, event):
-    #     if source is self.canvas:
-    #         if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
-    #             self.drag_start_position = event.pos()
-    #         elif event.type() == QEvent.MouseMove and event.buttons() & Qt.LeftButton:
-    #             if (event.pos() - self.drag_start_position).manhattanLength() >= QApplication.startDragDistance():
-    #                 self.start_drag(event)
-    #                 return True  # Block further handling
-    #     return super().eventFilter(source, event)
-
     def dragEnterEvent(self, event):
-        # Accept both external file drops and internal drag reorder
-        if event.mimeData().hasUrls() or event.mimeData().hasFormat("application/x-plotwidget"):
+        # Accept external file drops
+        if event.mimeData().hasUrls():
             event.acceptProposedAction()
 
 
@@ -165,33 +71,6 @@ class PlotWidget(QFrame):
             if updated:
                 self.tab_parent.global_update()
             event.acceptProposedAction()
-        elif event.mimeData().hasFormat("application/x-plotwidget"):
-            # Internal reorder drop
-            data = event.mimeData().data("application/x-plotwidget")
-            stream = QDataStream(data, QIODevice.ReadOnly)
-            source_id = stream.readInt64()
-            event.acceptProposedAction()
-            self.tab_parent.handle_reorder(source_id, id(self))
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.drag_start_position = event.pos()
-
-    def start_drag(self, event):
-        drag = QDrag(self)
-        mime_data = QMimeData()
-
-        # Store the id of the widget being dragged so we can identify it on drop
-        data = QByteArray()
-        stream = QDataStream(data, QIODevice.WriteOnly)
-        stream.writeInt64(id(self))
-        mime_data.setData("application/x-plotwidget", data)
-
-        drag.setMimeData(mime_data)
-        drag.setPixmap(self.grab())
-        drag.setHotSpot(event.pos())
-
-        drag.exec(Qt.MoveAction)
 
 
     def determine_local_extremes(self) -> None:
@@ -238,6 +117,7 @@ class PlotWidget(QFrame):
     def open_context_menu(self, pos: QPoint):
         menu = QMenu(self)
 
+        # Rename window
         rename_action = QAction('Rename line', self)
         if not self.plotted_files:
             rename_action.setDisabled(True)
@@ -245,6 +125,15 @@ class PlotWidget(QFrame):
             rename_action.triggered.connect(self.rename_line_dialog)
         menu.addAction(rename_action)
 
+        color_action = QAction('Change colors', self)
+        if not self.plotted_files:
+            color_action.setDisabled(True)
+        else:
+            color_action.triggered.connect(self.change_color_dialog)
+        menu.addAction(color_action)
+
+
+        # Remove window
         menu.addSeparator()
         remove_menu = menu.addMenu("Remove Plotted File")
         if not self.plotted_files:
@@ -260,6 +149,7 @@ class PlotWidget(QFrame):
         remove_plot_action.triggered.connect(lambda: self.remove_requested.emit(self))
         menu.addAction(remove_plot_action)
 
+        # Save window
         menu.addSeparator()
         save_action = QAction('Save figure', self)
         if not self.plotted_files:
@@ -270,7 +160,7 @@ class PlotWidget(QFrame):
 
         menu.exec(self.mapToGlobal(pos))
 
-    def rename_line_dialog(self):
+    def rename_line_dialog(self) -> None:
 
         # Build list of current labels
         lines = self.plotted_files.values()
@@ -286,7 +176,17 @@ class PlotWidget(QFrame):
             if line.get_label() != old_label: continue
             line.set_label(new_label)
             break
-        self.update_legend()
+        self.update_plot()
+
+    def change_color_dialog(self) -> None:
+        dlg = ColorDialog(self.plotted_files, self)
+        if dlg.exec() != QDialog.Accepted: return
+
+        new_colors = dlg.get_color_map()
+        for key, color in new_colors.items():
+            self.plotted_files[key].set_color(color)
+
+        self.update_plot()
 
 
     def remove_file(self, file_path):
