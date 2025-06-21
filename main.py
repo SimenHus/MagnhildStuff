@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QDir
 import os
 
 # === Import Tabs ===
-from src.GUI import PlottingTab, FileSummaryTab
+from src.GUI import H5ANTTab, FileSummaryTab, S2PTab
 from src.GUI.CustomWidgets import FileExplorer
 from src.util import Logging, Path
 
@@ -23,10 +23,12 @@ class MainWindow(QMainWindow):
 
         # === Tabs ===
         self.tabs = QTabWidget()
-        self.plotting_tab = PlottingTab()
+        self.plotting_tab = H5ANTTab()
         self.summary_tab = FileSummaryTab()
+        self.s2p_tab = S2PTab()
         self.tabs.addTab(self.plotting_tab, self.plotting_tab.description)
         self.tabs.addTab(self.summary_tab, self.summary_tab.description)
+        self.tabs.addTab(self.s2p_tab, self.s2p_tab.description)
 
 
         # === Bottom Output Box ===

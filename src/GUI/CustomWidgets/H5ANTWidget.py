@@ -17,7 +17,7 @@ from src.util import Logging, Path
 
 from .Dialogs import RenameLineDialog, SaveFigureDialog, ColorDialog
 
-class PlotWidget(QFrame):
+class H5ANTWidget(QFrame):
     # Signal emitted when this plot widget wants to be removed
     remove_requested = Signal(QWidget)
 
@@ -50,7 +50,7 @@ class PlotWidget(QFrame):
         self.peak = None
         self.floor = None
 
-        self.logger = Logging.get_logger('PlotWidget')
+        self.logger = Logging.get_logger('h5ant Widget')
 
 
     def dragEnterEvent(self, event):

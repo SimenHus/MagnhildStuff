@@ -4,13 +4,13 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from src.GUI.CustomWidgets import PlotWidget
+from src.GUI.CustomWidgets import S2PWidget
 from src.enums import Normalization
 from src.util import Logging
 import numpy as np
 
-class PlottingTab(QWidget):
-    description = 'Plotting'
+class S2PTab(QWidget):
+    description = 's2p'
     def __init__(self):
         super().__init__()
         self.layout = QVBoxLayout()
@@ -23,20 +23,6 @@ class PlottingTab(QWidget):
 
         self.settings_group = QGroupBox('Settings')
         self.settings_layout = QFormLayout()
-
-        self.normalization_mode_selector = QComboBox()
-        modes = list(Normalization)
-        for mode in modes:
-            self.normalization_mode_selector.addItem(mode.name, userData=mode)
-        self.normalization_mode = modes[0]
-        self.normalization_mode_selector.setCurrentIndex(0)
-        self.normalization_mode_selector.currentIndexChanged.connect(self.update_normalization_mode)
-
-        normalization_widget = QWidget()
-        normalization_layout = QHBoxLayout()
-        normalization_layout.addWidget(QLabel('Normalization mode:'))
-        normalization_layout.addWidget(self.normalization_mode_selector)
-        normalization_widget.setLayout(normalization_layout)
 
         columns_init = 2
         self.columns_spinbox = QSpinBox()
@@ -51,7 +37,6 @@ class PlottingTab(QWidget):
         columns_layout.addWidget(self.columns_spinbox)
         columns_widget.setLayout(columns_layout)
 
-        self.settings_layout.addWidget(normalization_widget)
         self.settings_layout.addWidget(columns_widget)
         self.settings_layout.addWidget(self.add_button)
         self.settings_group.setLayout(self.settings_layout)
@@ -69,11 +54,11 @@ class PlottingTab(QWidget):
         self.plot_widgets = []
         self.setAcceptDrops(True)
 
-        self.logger = Logging.get_logger('Plot Tab')
+        self.logger = Logging.get_logger('s2p Tab')
 
 
     def add_plot(self):
-        plot_widget = PlotWidget(self)
+        plot_widget = S2PWidget(self)
         plot_widget.setMinimumSize(400, 300)
         plot_widget.remove_requested.connect(self.remove_plot)
 
@@ -132,6 +117,11 @@ class PlottingTab(QWidget):
         # Update layout
         self.relayout_grid()
 
+    def update_columns(self, value: int) -> None:
+        self.columns = value
+        self.relayout_grid()
+
+
     def global_update(self) -> None:
         for plot in self.plot_widgets:
             plot.prepare_for_update() # Prepare for plotting (update extremes etc)
@@ -139,29 +129,3 @@ class PlottingTab(QWidget):
         for plot in self.plot_widgets:
             plot.update_plot() # Perform plot update
         self.logger.info('Performed global plot update')
-
-    def update_normalization_mode(self, *args, **kwargs) -> None:
-        from_mode = self.normalization_mode
-        self.normalization_mode = self.normalization_mode_selector.currentData(Qt.UserRole)
-        self.logger.info(f'Updated normalization mode from {from_mode.name} to {self.normalization_mode.name}')
-        self.global_update()
-
-    def update_columns(self, value: int) -> None:
-        self.columns = value
-        self.relayout_grid()
-
-    @property
-    def peak(self) -> float:
-        peak = -np.inf
-        for plot in self.plot_widgets:
-            if plot.peak is None: continue
-            if plot.peak > peak: peak = plot.peak
-        return peak
-    
-    @property
-    def floor(self) -> float:
-        floor = np.inf
-        for plot in self.plot_widgets:
-            if plot.floor is None: continue
-            if plot.floor < floor: floor = plot.floor
-        return floor

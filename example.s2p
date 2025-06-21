@@ -1,0 +1,7 @@
+! Dummy 2-port S-parameter file for debugging
+# GHz S MA R 50
+
+! Freq     S11 Mag   S11 Ang   S21 Mag   S21 Ang   S12 Mag   S12 Ang   S22 Mag   S22 Ang
+1.0        0.5       -45       2.0       0         0.1       90        0.4       -30
+2.0        0.4       -50       1.8       5         0.05      85        0.3       -25
+3.0        0.3       -55       1.5       10        0.02      80        0.2       -20
