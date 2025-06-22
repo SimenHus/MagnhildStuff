@@ -71,14 +71,15 @@ class S2PWidget(QFrame):
  
         # Create the 3 subplots using gridspec
         self.gs = gridspec.GridSpec(2, 2, width_ratios=[2, 1], figure=self.figure)
-        self.ax_mag = self.figure.add_subplot(self.gs[0, 0])
-        self.ax_phase = self.figure.add_subplot(self.gs[1, 0])
-        self.ax_smith = self.figure.add_subplot(self.gs[:, 1])
+        # self.ax_mag = self.figure.add_subplot(self.gs[0, 0])
+        self.ax_mag = self.figure.add_subplot(self.gs[:, :])
+        # self.ax_phase = self.figure.add_subplot(self.gs[1, 0])
+        # self.ax_smith = self.figure.add_subplot(self.gs[:, 1])
 
-        self.ax_smith.set_title('Smith Chart')
+        # self.ax_smith.set_title('Smith Chart')
 
         self.ax_mag.grid()
-        self.ax_phase.grid()
+        # self.ax_phase.grid()
 
         self.legend = None
         self.bbox_to_anchor = None
@@ -136,16 +137,17 @@ class S2PWidget(QFrame):
             plotted_lines = {}
             for s in SParameter:
                 before_mag = set(self.ax_mag.get_lines())
-                before_phase = set(self.ax_phase.get_lines())
-                before_smith = set(self.ax_smith.get_lines())
+                # before_phase = set(self.ax_phase.get_lines())
+                # before_smith = set(self.ax_smith.get_lines())
                 graph.plot_s_db(m=s.m, n=s.n, ax=self.ax_mag, label=f'{label}-{s.name}')
-                graph.plot_s_deg(m=s.m, n=s.n, ax=self.ax_phase)
-                graph.plot_s_smith(m=s.m, n=s.n, ax=self.ax_smith)
+                # graph.plot_s_deg(m=s.m, n=s.n, ax=self.ax_phase)
+                # graph.plot_s_smith(m=s.m, n=s.n, ax=self.ax_smith)
                 mag_line = [line for line in self.ax_mag.get_lines() if line not in before_mag][0]
-                phase_line = [line for line in self.ax_phase.get_lines() if line not in before_phase][0]
-                smith_line = [line for line in self.ax_smith.get_lines() if line not in before_smith][0]
+                # phase_line = [line for line in self.ax_phase.get_lines() if line not in before_phase][0]
+                # smith_line = [line for line in self.ax_smith.get_lines() if line not in before_smith][0]
                 color = mag_line.get_color()
-                plotted_lines[s]  = SParamPlotLines(mag_line, phase_line, smith_line, color)
+                # plotted_lines[s] = SParamPlotLines(mag_line, phase_line, smith_line, color)
+                plotted_lines[s] = SParamPlotLines(mag_line, None, None, color)
 
             self.plotted_lines[file_path] = plotted_lines
             self.plotted_files[file_path] = label
@@ -292,8 +294,8 @@ class S2PWidget(QFrame):
             self.legend.set_draggable(True)
         
         if self.ax_mag.get_legend() is not None: self.ax_mag.get_legend().remove()
-        if self.ax_phase.get_legend() is not None: self.ax_phase.get_legend().remove()
-        if self.ax_smith.get_legend() is not None: self.ax_smith.get_legend().remove()
+        # if self.ax_phase.get_legend() is not None: self.ax_phase.get_legend().remove()
+        # if self.ax_smith.get_legend() is not None: self.ax_smith.get_legend().remove()
 
 
     def update_plot_sparams(self) -> None:
@@ -308,10 +310,10 @@ class S2PWidget(QFrame):
                 plot_lines.mag.set_label(f'{self.plotted_files[file_path]}-{s.name}')
                 plot_lines.mag.set_visible(show)
                 plot_lines.mag.set_color(plot_lines.color)
-                plot_lines.phase.set_visible(show)
-                plot_lines.phase.set_color(plot_lines.color)
-                plot_lines.smith.set_visible(show)
-                plot_lines.smith.set_color(plot_lines.color)
+                # plot_lines.phase.set_visible(show)
+                # plot_lines.phase.set_color(plot_lines.color)
+                # plot_lines.smith.set_visible(show)
+                # plot_lines.smith.set_color(plot_lines.color)
 
 
 
@@ -327,7 +329,8 @@ class S2PWidget(QFrame):
             freq_B = None
 
         for key, freq in zip(('A', 'B'), (freq_A, freq_B)):
-            for ax_key, ax in [('mag', self.ax_mag), ('phase', self.ax_phase)]:
+            # for ax_key, ax in [('mag', self.ax_mag), ('phase', self.ax_phase)]:
+            for ax_key, ax in [('mag', self.ax_mag)]:
                 # Remove old line if it exists
                 line = self.marker_lines[key][ax_key]
                 if line:
