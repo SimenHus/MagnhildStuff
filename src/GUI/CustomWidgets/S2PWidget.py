@@ -345,11 +345,16 @@ class S2PWidget(QFrame):
                 else:
                     self.marker_lines[key][ax_key] = None
 
+    def update_axis(self) -> None:
+        self.ax_mag.relim(visible_only=True)
+        self.ax_mag.autoscale_view()
 
     def update_plot(self) -> None:
         self.update_plot_sparams()
         self.update_marker_lines()
         self.update_legend()
+
+        self.update_axis()
 
         # self.figure.tight_layout()
         self.canvas.draw_idle()
